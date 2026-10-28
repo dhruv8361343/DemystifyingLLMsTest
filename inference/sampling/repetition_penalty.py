@@ -16,12 +16,18 @@ def apply_repetition_penalty(
         return logits
 
     logits = logits.clone()
-    if isinstance(generated_tokens, torch.Tensor):
-        unique_tokens = torch.unique(generated_tokens).tolist()
+    if isinstance(generated_tokens, torch.Tensor) and generated_tokens.dim() > 1:
+        rows = generated_tokens.reshape(generated_tokens.size(0), -1)
+        for row_idx, row in enumerate(rows):
+            for token_id in torch.unique(row).tolist():
+                if 0 <= token_id < logits.size(-1):
+                    value = logits[row_idx, token_id]
+                    logits[row_idx, token_id] = value * penalty if value < 0 else value / penalty
     else:
-        unique_tokens = list(set(generated_tokens))
-
-    for token_id in unique_tokens:
-        logits[..., token_id] = logits[..., token_id] - penalty
+        unique_tokens = torch.unique(generated_tokens).tolist() if isinstance(generated_tokens, torch.Tensor) else set(generated_tokens)
+        for token_id in unique_tokens:
+            if 0 <= token_id < logits.size(-1):
+                value = logits[..., token_id]
+                logits[..., token_id] = torch.where(value < 0, value * penalty, value / penalty)
 
     return logits
