@@ -37,7 +37,8 @@ class RequestHandler:
         if self.tokenizer is not None and hasattr(self.tokenizer, "encode"):
             prompt_tokens = self.tokenizer.encode(prompt)
         else:
-            prompt_tokens = [ord(c) for c in prompt]
+            vocab_sz = getattr(getattr(self.engine, "model_config", None), "vocab_size", 50257)
+            prompt_tokens = [ord(c) % vocab_sz for c in prompt]
 
         # Generate continuation
         if self.engine is not None and hasattr(self.engine, "generate_tokens"):

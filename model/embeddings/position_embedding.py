@@ -77,7 +77,10 @@ class LearnedPositionEmbedding(nn.Module):
         offset: int = 0,
         device: Optional[torch.device] = None
     ) -> torch.Tensor:
-        positions = torch.arange(offset, offset + seq_len, dtype=torch.long)
-        if device is not None:
-            positions = positions.to(device)
+        if offset + seq_len > self.max_seq_len:
+            raise ValueError(
+                f"Requested position index {offset + seq_len} exceeds max_seq_len {self.max_seq_len}"
+            )
+        target_device = device if device is not None else self.wpe.weight.device
+        positions = torch.arange(offset, offset + seq_len, dtype=torch.long, device=target_device)
         return self.wpe(positions).unsqueeze(0)

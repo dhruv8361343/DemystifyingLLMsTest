@@ -12,8 +12,16 @@ def apply_repetition_penalty(
     Apply repetition penalty to logits for generated tokens.
     DIVISIVELY (logits / penalty for pos, logits * penalty for neg).
     """
+    if penalty <= 0.0:
+        raise ValueError(f"penalty must be positive, got {penalty}")
     if penalty == 1.0:
         return logits
+
+    if not isinstance(generated_tokens, torch.Tensor) and isinstance(generated_tokens, (list, tuple)):
+        try:
+            generated_tokens = torch.tensor(generated_tokens, dtype=torch.long)
+        except Exception:
+            pass
 
     logits = logits.clone()
     if isinstance(generated_tokens, torch.Tensor) and generated_tokens.dim() > 1:

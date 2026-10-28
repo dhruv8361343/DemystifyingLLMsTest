@@ -50,7 +50,8 @@ class ServingPipeline:
         if self.tokenizer is not None and hasattr(self.tokenizer, "encode"):
             tokens = self.tokenizer.encode(text)
         else:
-            tokens = [ord(c) for c in text]
+            vocab_sz = getattr(self.config, "vocab_size", 50257)
+            tokens = [ord(c) % vocab_sz for c in text]
 
         input_ids = torch.tensor([tokens], dtype=torch.long, device=self.device)
 

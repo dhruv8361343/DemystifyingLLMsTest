@@ -44,7 +44,7 @@ class Vocabulary:
     def id_to_token(self, idx: int) -> str:
         if idx in self._id_to_token:
             return self._id_to_token[idx]
-        return self._id_to_token.get(idx, UNK_TOKEN)
+        return f"<token_{idx}>"
 
     def __len__(self) -> int:
         return max(self._id_to_token, default=-1) + 1

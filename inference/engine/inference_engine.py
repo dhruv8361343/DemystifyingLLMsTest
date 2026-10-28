@@ -78,16 +78,22 @@ class InferenceEngine:
 
     def generate_tokens(
         self,
-        prompt_tokens: List[int],
+        prompt_tokens: Union[List[int], torch.Tensor],
         max_new_tokens: Optional[int] = None,
         temperature: Optional[float] = None,
         top_k: Optional[int] = None,
-        top_p: Optional[float] = None
+        top_p: Optional[float] = None,
+        **kwargs
     ) -> List[int]:
         """
         Generate a list of token IDs autoregressively from input token sequence.
         """
         self._prepare_model()
+
+        if isinstance(prompt_tokens, torch.Tensor):
+            prompt_tokens = prompt_tokens.squeeze().tolist()
+            if isinstance(prompt_tokens, int):
+                prompt_tokens = [prompt_tokens]
 
         max_tokens = max_new_tokens if max_new_tokens is not None else self.inference_config.max_new_tokens
         if max_tokens <= 0:
@@ -96,12 +102,21 @@ class InferenceEngine:
         temp = temperature if temperature is not None else self.inference_config.temperature
         top_k = top_k if top_k is not None else self.inference_config.top_k
         top_p = top_p if top_p is not None else self.inference_config.top_p
+        rep_penalty = kwargs.get("repetition_penalty", self.inference_config.repetition_penalty)
+
+        stop_ids = list(self.inference_config.stop_token_ids or [])
+        if "stop_token_ids" in kwargs and kwargs["stop_token_ids"] is not None:
+            extra = kwargs["stop_token_ids"]
+            stop_ids.extend(extra if isinstance(extra, (list, tuple, set)) else [extra])
+        if "eos_token_id" in kwargs and kwargs["eos_token_id"] is not None:
+            stop_ids.append(kwargs["eos_token_id"])
+
         from inference.sampling import Sampler
         sampler = Sampler(
             temperature=temp,
             top_k=top_k,
             top_p=top_p,
-            repetition_penalty=self.inference_config.repetition_penalty,
+            repetition_penalty=rep_penalty,
         )
         tokens = list(prompt_tokens)
         if not tokens:
@@ -145,7 +160,7 @@ class InferenceEngine:
 
                 tokens.append(int(next_token))
 
-                if next_token in self.inference_config.stop_token_ids:
+                if next_token in stop_ids:
                     break
 
         return tokens
@@ -164,13 +179,14 @@ class InferenceEngine:
         self._failed = False
 
         # Tokenize prompt
+        vocab_sz = getattr(self.model_config, "vocab_size", 50257)
         if tokenizer is not None and hasattr(tokenizer, "encode"):
             try:
                 prompt_ids = tokenizer.encode(prompt)
             except Exception:
-                prompt_ids = [ord(c) for c in prompt]
+                prompt_ids = [ord(c) % vocab_sz for c in prompt]
         else:
-            prompt_ids = [ord(c) for c in prompt]
+            prompt_ids = [ord(c) % vocab_sz for c in prompt]
 
         # Generate tokens
         output_ids = self.generate_tokens(
